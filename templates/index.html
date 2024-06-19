@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-Time Code Editor</title>
+    <style>
+        :root {
+            --background-color-light: #ffffff;
+            --background-color-dark: #1e1e1e;
+            --text-color-light: #000000;
+            --text-color-dark: #ffffff;
+            --border-color-light: #ccc;
+            --border-color-dark: #444;
+        }
+
+        body.light {
+            background-color: var(--background-color-light);
+            color: var(--text-color-light);
+        }
+
+        body.dark {
+            background-color: var(--background-color-dark);
+            color: var(--text-color-dark);
+        }
+
+        #container {
+            display: flex;
+        }
+
+        #sidebar {
+            width: 20%;
+            height: 90vh;
+            border: 1px solid var(--border-color-light);
+            overflow-y: auto;
+        }
+
+        #codeArea {
+            width: 80%;
+            height: 90vh;
+            font-family: monospace;
+            font-size: 14px;
+            border: 1px solid var(--border-color-light);
+        }
+
+        body.dark #sidebar, body.dark #codeArea {
+            border-color: var(--border-color-dark);
+        }
+
+        #themeToggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        #typingIndicator {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            font-size: 14px;
+            color: var(--text-color-light);
+        }
+
+        body.dark #typingIndicator {
+            color: var(--text-color-dark);
+        }
+    </style>
+</head>
+<body class="light">
+    <div id="themeToggle">Switch to Dark Theme</div>
+    <div id="container">
+        <div id="sidebar">
+            <h3>Users</h3>
+            <ul id="usersList"></ul>
+        </div>
+        <textarea id="codeArea"></textarea>
+    </div>
+    <div id="typingIndicator"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const codeArea = document.getElementById('codeArea');
+        const usersList = document.getElementById('usersList');
+        const themeToggle = document.getElementById('themeToggle');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const body = document.body;
+
+        const username = prompt("Enter your username:");
+        const room = prompt("Enter room name:");
+
+        socket.emit('join', {username, room});
+
+        codeArea.addEventListener('input', () => {
+            const code = codeArea.value;
+            socket.emit('code_update', {room, code});
+            socket.emit('typing', {username, room});
+        });
+
+        socket.on('code_update', (data) => {
+            codeArea.value = data.code;
+        });
+
+        socket.on('message', (data) => {
+            console.log(data.msg);
+        });
+
+        socket.on('update_users', (data) => {
+            usersList.innerHTML = '';
+            data.users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user;
+                usersList.appendChild(li);
+            });
+        });
+
+        socket.on('typing', (data) => {
+            typingIndicator.textContent = `${data.username} is typing...`;
+            clearTimeout(typingIndicator.timeout);
+            typingIndicator.timeout = setTimeout(() => {
+                typingIndicator.textContent = '';
+            }, 1000);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            socket.emit('leave', {username, room});
+        });
+
+        themeToggle.addEventListener('click', () => {
+            if (body.classList.contains('light')) {
+                body.classList.remove('light');
+                body.classList.add('dark');
+                themeToggle.textContent = 'Switch to Light Theme';
+            } else {
+                body.classList.remove('dark');
+                body.classList.add('light');
+                themeToggle.textContent = 'Switch to Dark Theme';
+            }
+        });
+    </script>
+</body>
+</html>
